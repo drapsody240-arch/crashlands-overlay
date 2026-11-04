@@ -1,0 +1,4 @@
+node_modules/
+release/
+*.pem
+!update-public-key.pem

@@ -1,0 +1,32 @@
+{
+  "name": "crashlands-overlay",
+  "productName": "CrashLands Overlay",
+  "version": "0.4.5",
+  "description": "The CrashLands overlay for The Isle: HUD, minimap, notifications and the player website in game",
+  "author": "CrashLands",
+  "private": true,
+  "main": "app/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never",
+    "sign": "node tools/sign-release.cjs"
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9",
+    "koffi": "2.9.0"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "online.crashlands.overlay",
+    "productName": "CrashLands Overlay",
+    "directories": { "output": "release" },
+    "files": ["app/**/*", "update-public-key.pem", "package.json"],
+    "asarUnpack": ["node_modules/koffi/**"],
+    "win": { "target": "nsis", "icon": "app/icon.ico", "artifactName": "CrashLands-Overlay-Setup-${version}.${ext}" },
+    "nsis": { "oneClick": true, "perMachine": false, "deleteAppDataOnUninstall": false },
+    "publish": [{ "provider": "generic", "url": "https://players.crashlands.online/overlay/download/" }]
+  }
+}

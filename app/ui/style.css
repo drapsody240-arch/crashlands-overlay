@@ -1,0 +1,86 @@
+:root { --accent: #7cf2a6; --cyan: #8eeaf6; --panel: rgba(12, 16, 20, 0.78); --line: rgba(255, 255, 255, 0.1); }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font: 13px/1.35 system-ui, "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif; color: #e8edf2; user-select: none; }
+[hidden] { display: none !important; }
+
+/* Movable parts: placed by the layout (fractions of the game's area), dragged in Edit layout. */
+.movable { position: fixed; left: 0; top: 0; }
+body.editing .movable { outline: 2px dashed rgba(124, 242, 166, 0.85); outline-offset: 4px; cursor: grab; z-index: 20; }
+body.editing .movable:active { cursor: grabbing; }
+body.editing .movable::after { content: attr(data-label); position: absolute; left: 0; top: -26px; padding: 1px 8px; background: #2f8a5a; border-radius: 4px; font: 600 11px system-ui, sans-serif; white-space: nowrap; color: #fff; }
+
+/* HUD: the game's honeycomb of vitals, copied (dark teal, glowing cyan rims), solid so it covers the game's own,
+   each hexagon filled from the bottom with the % written in it. */
+#hud svg { display: block; width: 100%; height: 100%; overflow: visible; }
+/* The frame and icons are images (img/, app.js buildHud); a low stat's frame turns red and pulses. */
+#hud .level { opacity: 0.55; }
+#hud .bileBg { fill: rgba(5, 15, 19, 0.92); stroke: var(--cyan); stroke-width: 1.2; filter: drop-shadow(0 0 2px rgba(142, 234, 246, 0.8)); }
+#hud .bileLvl { fill: #9be36b; opacity: 0.85; }
+#hud .bileLbl { fill: var(--cyan); font: 700 10px "Segoe UI", system-ui, sans-serif; }
+#hud .bilePct { fill: #fff; font: 800 9px "Segoe UI", system-ui, sans-serif; paint-order: stroke; stroke: rgba(0, 20, 26, 0.9); stroke-width: 2px; }
+#hud .low .frame { filter: url(#lowRed); animation: lowPulse 1s ease-in-out infinite; }
+@keyframes lowPulse { 50% { opacity: 0.55; } }
+#hud .icon { fill: var(--cyan); opacity: 0.95; filter: drop-shadow(0 0 2px rgba(142, 234, 246, 0.8)); }
+#hud .greek { fill: var(--cyan); font: 700 22px "Segoe UI", system-ui, sans-serif; filter: drop-shadow(0 0 2px rgba(142, 234, 246, 0.8)); }
+#hud .pct { fill: #fff; font: 800 15px "Segoe UI", system-ui, sans-serif; paint-order: stroke; stroke: rgba(0, 20, 26, 0.9); stroke-width: 3px; }
+#hud .pct.small { font-size: 11px; }
+#hud .low .rim { stroke: #ff6a6a; animation: pulse 1s ease-in-out infinite; }
+#hud .stam { fill: var(--cyan); }
+#hud .growth { fill: var(--cyan); font: 700 11px "Segoe UI", system-ui, sans-serif; }
+@keyframes pulse { 50% { stroke-width: 5; opacity: 0.6; } }
+
+#mini { background: transparent; }
+#miniCanvas { display: block; }
+#mini .miniFrame { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.miniN { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); font-weight: 800; font-size: 11px; color: #fff; text-shadow: 0 0 3px #000; }
+
+#voice { max-width: 260px; padding: 6px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; text-shadow: 0 1px 2px #000; }
+#voice.talking { border-color: var(--accent); box-shadow: 0 0 8px rgba(124, 242, 166, 0.5); } #voice.muted #voiceIcon { filter: grayscale(1); opacity: 0.5; }
+#voiceText { margin-left: 6px; opacity: 0.85; } #voiceWho { margin-top: 3px; color: var(--accent); font-weight: 600; }
+
+#notes { position: fixed; top: 18px; right: 18px; width: 340px; display: flex; flex-direction: column; gap: 8px; z-index: 30; }
+.note { padding: 9px 12px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; animation: in 0.25s ease; text-shadow: 0 1px 2px #000; }
+.note.warn { border-left-color: #ffcf4a; } .note.chat { border-left-color: #5ab6ff; }
+.note.out { opacity: 0; transform: translateX(30px); transition: 0.4s; }
+@keyframes in { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+
+#editBar { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 40; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; max-width: 92vw;
+  padding: 10px 14px; background: #12171c; border: 1px solid var(--accent); border-radius: 10px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6); }
+#editBar label { display: flex; align-items: center; gap: 6px; } #editBar input[type=range] { width: 120px; }
+
+#dash { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 10; }
+body.editing #dash { background: rgba(0, 0, 0, 0.2); }
+body.editing #dashBar { display: none; }
+#dashBar { position: absolute; height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 8px; background: #12171c; border: 1px solid var(--line); border-radius: 10px 10px 0 0; }
+#dashBar b { color: var(--accent); } #dashStatus { opacity: 0.6; font-size: 12px; }
+.sp { flex: 1; }
+button { font: inherit; color: #e8edf2; background: #232b33; border: 1px solid var(--line); border-radius: 6px; padding: 4px 11px; cursor: pointer; }
+button:hover { background: #2c3640; } button.primary { background: #2f8a5a; border-color: #3fa96f; }
+.card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 460px; max-width: 90vw; max-height: 88vh; overflow-y: auto; padding: 20px 22px; background: #12171c; border: 1px solid var(--line); border-radius: 12px; }
+.card h2 { margin: 0 0 10px; } .card h3 { font-size: 14px; }
+.card label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; }
+.card label.check { justify-content: flex-start; } .card label.check input { margin: 0 8px 0 0; }
+.card input[type=range] { width: 200px; } .card input:not([type]), .card select { background: #1b2229; color: inherit; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.meter { position: relative; flex: 1; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; margin: 0 8px; overflow: hidden; }
+#sLevel { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #5ab6ff; } #sThresh { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--accent); }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.muted { opacity: 0.6; font-size: 12px; }
+
+/* Staff overlay */
+#tabs { display: inline-flex; gap: 4px; margin-left: 8px; } #tabs button { padding: 2px 9px; }
+.card.wide { width: 720px; }
+#stList { display: grid; gap: 4px; max-height: 55vh; overflow-y: auto; }
+.stRow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.stRow.sel { border-color: var(--accent); }
+.stRow .who { flex: 1; min-width: 0; } .stRow .who small { opacity: .6; }
+.stRow button { padding: 2px 8px; }
+.note.staff { border-left-color: #ff9f43; }
+/* Staff tickets */
+.subtabs { display: inline-flex; gap: 4px; margin-left: 10px; } .subtabs button { padding: 2px 9px; }
+#stTkList { display: grid; gap: 4px; max-height: 55vh; overflow-y: auto; }
+.tkRow { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.tkRow:hover { border-color: var(--accent); } .tkRow small { opacity: 0.6; } .tkRow .last { opacity: 0.8; font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#stTkMsgs { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; overflow-y: auto; padding: 4px; }
+.tkMsg { max-width: 85%; padding: 7px 10px; border-radius: 9px; background: rgba(255, 255, 255, 0.06); align-self: flex-start; white-space: pre-wrap; }
+.tkMsg.staff { align-self: flex-end; background: rgba(255, 159, 67, 0.16); }
+.tkMsg .meta { font-size: 11px; opacity: 0.6; margin-bottom: 2px; }

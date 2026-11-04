@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' wss://players.crashlands.online; media-src 'self' blob: mediastream:">
+<title>CrashLands Overlay</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- HUD: health, stamina, food and water as hexagons like the game's (solid, so they sit over the game's own) -->
+  <div id="hud" class="movable" data-part="hud" data-label="HUD" hidden></div>
+
+  <!-- Minimap: you and your friends only -->
+  <div id="mini" class="movable" data-part="map" data-label="Minimap" hidden><canvas id="miniCanvas"></canvas><img class="miniFrame" src="img/minimap-frame.png" alt=""></div>
+
+  <!-- Proximity voice: who's talking near you -->
+  <div id="voice" class="movable" data-part="voice" data-label="Voice" hidden><span id="voiceIcon">🎙️</span><span id="voiceText"></span><div id="voiceWho"></div></div>
+
+  <!-- Notifications -->
+  <div id="notes"></div>
+
+  <!-- Layout editor: drag the HUD, minimap and voice box anywhere -->
+  <div id="editBar" hidden>
+    <b>Move things around</b><span class="muted">Drag the hexagons, the minimap and the voice box.</span>
+    <label>HUD size <input type="range" id="eHex" min="5" max="30" step="0.1"></label>
+    <label>Minimap size <input type="range" id="eMap" min="140" max="420" step="10"></label>
+    <button id="eReset">Reset</button><button id="eDone" class="primary">Done</button>
+  </div>
+
+  <!-- Dashboard frame (the player website shows inside it) -->
+  <div id="dash" hidden>
+    <div id="dashBar">
+      <b>🦖 CrashLands</b><span id="tabs" hidden><button data-tab="site" class="primary">Website</button><button data-tab="admin">🛡️ Admin</button><button data-tab="staff">🛡️ Staff tools</button></span><span id="dashStatus"></span><div class="sp"></div>
+      <button id="btnEdit" title="Move the HUD, minimap and voice box">Edit layout</button><button id="btnSettings">Settings</button><button id="btnClose" title="Close (Esc or your dashboard key)">✕</button>
+    </div>
+    <div id="signIn" class="card" hidden>
+      <h2>Sign in with Steam</h2>
+      <p>The overlay uses your CrashLands player account: sign in once in your browser and it remembers you.</p>
+      <button id="btnSignIn" class="primary">Sign in with Steam</button>
+      <p id="signInWait" class="muted" hidden>Waiting for you to sign in in your browser…</p>
+    </div>
+    <div id="staffPanel" class="card wide" hidden>
+      <div class="row" style="margin:0 0 8px"><h2 style="margin:0">🛡️ Staff tools</h2><span class="muted" id="stRole"></span>
+        <span class="subtabs"><button data-sub="players" class="primary">Players</button><button data-sub="tickets">Tickets <span id="stTkCount"></span></button></span>
+        <div class="sp"></div><input id="stFind" placeholder="Find a player…" style="width:180px"></div>
+      <div id="stPlayers">
+        <p class="muted" style="margin:0 0 8px">Players in game, nearest first. Everything here goes through the admin panel with your own permissions, and is logged under your name.</p>
+        <div id="stList"></div>
+        <div class="row" style="margin-top:10px"><input id="stMsg" maxlength="200" placeholder="Message for the selected player" style="flex:1"></div>
+      </div>
+      <div id="stTickets" hidden>
+        <div id="stTkList"></div>
+        <div id="stTkView" hidden>
+          <div class="row" style="margin:0 0 6px"><button id="stTkBack">← All tickets</button><b id="stTkTitle"></b><div class="sp"></div><button id="stTkClaim">🙋 Claim</button></div>
+          <div id="stTkMsgs"></div>
+          <div class="row" style="margin-top:8px"><textarea id="stTkReply" rows="2" maxlength="1800" placeholder="Reply (posted in the ticket on Discord as you, and to the player if it's a website ticket)" style="flex:1"></textarea><button class="primary" id="stTkSend">Send</button></div>
+          <div class="row" style="margin-top:6px"><input id="stTkReason" maxlength="300" placeholder="Reason for closing (optional)" style="flex:1"><button id="stTkClose">🔒 Close ticket</button></div>
+        </div>
+      </div>
+    </div>
+    <div id="settings" class="card" hidden>
+      <h2>Overlay settings</h2>
+      <label class="check"><input type="checkbox" id="sHud"> Show the HUD</label>
+      <label class="check"><input type="checkbox" id="sMini"> Show the minimap</label>
+      <label class="check"><input type="checkbox" id="sNotes"> Show notifications</label>
+      <label class="check" id="sRadarRow" hidden><input type="checkbox" id="sRadar"> 🛡️ Staff radar: every player near me on the minimap</label>
+      <label>Minimap zoom <input type="range" id="sMapZoom" min="1" max="8" step="0.5"></label>
+      <label>Opacity <input type="range" id="sOpacity" min="0.3" max="1" step="0.05"></label>
+      <label>Website panel size <input type="range" id="sDashSize" min="40" max="90" step="2"></label>
+      <label>Dashboard key <input id="sHotkey" maxlength="20" placeholder="F8"></label>
+      <p class="muted">To move the HUD, minimap or voice box, use <b>Edit layout</b> at the top.</p>
+      <h3 style="margin:14px 0 4px">Proximity voice</h3>
+      <label class="check"><input type="checkbox" id="sVoice"> Voice chat: hear and talk to players near you in game</label>
+      <label>Microphone <select id="sMic" style="max-width:240px"><option value="">Windows default</option></select></label>
+      <label>Mic sensitivity <span class="meter"><span id="sLevel"></span><span id="sThresh"></span></span><input type="range" id="sSens" min="0.002" max="0.12" step="0.002"></label>
+      <label>Voice volume <input type="range" id="sVolume" min="0" max="2" step="0.05"></label>
+      <label>How you talk <select id="sVoiceMode"><option value="open">Voice activation (talk and it sends)</option><option value="ptt">Push to talk (hold a key)</option></select></label>
+      <label>Push-to-talk key <input id="sPttKey" maxlength="20" placeholder="Mouse5"></label>
+      <label>Mute key <input id="sMuteKey" maxlength="20" placeholder="F9"></label>
+      <p class="muted">Voice activation: the overlay sends your voice once it's louder than the green line. Push to talk: only while you hold the key (a letter, F1-F24, Mouse4, Mouse5, CapsLock...). Press the mute key to mute or unmute.</p>
+      <p class="muted">Keys: F1–F12, Insert, Home, PageUp... or combinations like Alt+M.</p>
+      <div class="row"><button id="btnSave" class="primary">Save</button><button id="btnBack">Back</button><div class="sp"></div><button id="btnSignOut">Sign out</button><button id="btnQuit">Quit overlay</button></div>
+      <p class="muted" id="ver"></p>
+    </div>
+  </div>
+  <script src="voice.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
