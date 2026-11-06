@@ -257,15 +257,18 @@ async function signIn() {
   signing = code;
   shell.openExternal(`${SITE}/auth/overlay?c=${code}`);
   send('auth', { pending: true });
+  // Out of the way while they sign in in the browser (the dashboard would cover it); it comes back once signed in.
+  toggleDash(false);
+  send('note', { text: 'Finish signing in with Steam in your browser: the overlay opens again when you\'re done.', kind: 'info' });
   for (let i = 0; i < 300 && signing === code; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     try {
       const r = await (await fetch(`${SITE}/api/overlay/claim`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) })).json();
-      if (r.token) { writeSettings({ token: r.token, steam: r.steam }); signing = null; send('auth', { signedIn: true }); connectLive(); checkStaff(); return; }
+      if (r.token) { writeSettings({ token: r.token, steam: r.steam }); signing = null; send('auth', { signedIn: true }); connectLive(); checkStaff(); openDash(); return; }
       if (r.error) break;
     } catch { /* offline: keep trying */ }
   }
-  if (signing === code) { signing = null; send('auth', { signedIn: false, failed: true }); }
+  if (signing === code) { signing = null; send('auth', { signedIn: false, failed: true }); openDash(); }
 }
 async function signOut() {
   writeSettings({ token: null, steam: null });
