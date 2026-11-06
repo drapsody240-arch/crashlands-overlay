@@ -14,6 +14,9 @@ const crypto = require('crypto');
 const SITE = 'https://players.crashlands.online';
 const PARTITION = 'persist:crashlands';
 app.setAppUserModelId('online.crashlands.overlay');
+const LINUX = process.platform === 'linux';
+// Linux: run as an X11 app (on KDE/Wayland through XWayland), like Proton games, so it can find and sit over the game.
+if (LINUX) app.commandLine.appendSwitch('ozone-platform', 'x11');
 
 // ---- settings (the sign-in token is encrypted with Windows' own per-user protection) ----
 const SETTINGS = () => path.join(app.getPath('userData'), 'settings.json');
@@ -181,7 +184,7 @@ setInterval(() => {
 
 // Shown only while the game (or the overlay itself) is in front, on the game's screen.
 let nat = null;
-function native() { if (nat === null) { try { nat = require('./native.cjs'); } catch { nat = false; } } return nat || null; }
+function native() { if (nat === null) { try { nat = require(LINUX ? './native-linux.cjs' : './native.cjs'); } catch { nat = false; } } return nat || null; }
 const bootUntil = Date.now() + 5000;
 function track() {
   if (!win || win.isDestroyed()) return;
@@ -202,7 +205,7 @@ function track() {
     // game's window in windowed mode (so the HUD sits in the game's corners). Windows gives physical pixels;
     // Electron places windows in scaled units (display scaling 125%, 150%...).
     let area = null;
-    try { const c = n && gameHwnd && n.clientBounds(gameHwnd); if (c && c.width > 200 && c.height > 150) area = screen.screenToDipRect(null, c); } catch {}
+    try { const c = n && gameHwnd && n.clientBounds(gameHwnd); if (c && c.width > 200 && c.height > 150) area = toDip(c); } catch {}
     const disp = area ? screen.getDisplayMatching(area).bounds : screen.getPrimaryDisplay().bounds;
     // The dashboard always gets the whole screen; the HUD the game's area (or the screen when the game covers it).
     const covers = area && area.width >= disp.width - 2 && area.height >= disp.height - 2;
@@ -227,6 +230,12 @@ function track() {
   } catch { send('state', { game: !!gameHwnd, front }); }
 }
 let lastTop = 0, warnedFullscreen = false;
+// Screen pixels -> Electron's scaled units. X11 pixels are physical: divided by the display's scaling.
+function toDip(r) {
+  if (!LINUX) return screen.screenToDipRect(null, r);
+  const k = screen.getPrimaryDisplay().scaleFactor || 1;
+  return { x: Math.round(r.x / k), y: Math.round(r.y / k), width: Math.round(r.width / k), height: Math.round(r.height / k) };
+}
 
 // ---- sign-in (a code bound on the website after Steam sign-in; see panel/overlay.js) ----
 let signing = null;
@@ -293,6 +302,15 @@ function initUpdates() {
   if (!app.isPackaged) return;
   const { autoUpdater } = require('electron-updater');
   const KEY = fs.readFileSync(path.join(__dirname, '..', 'update-public-key.pem'), 'utf8');
+  // Linux (AppImage): electron-updater has no signature hook there, so nothing is downloaded: the player is told
+  // there's an update and gets it from the website.
+  if (LINUX) {
+    autoUpdater.autoDownload = false;
+    autoUpdater.on('update-available', (i) => send('note', { text: `Overlay update ${i.version} is out: download it from the Overlay page on the website.`, kind: 'info' }));
+    autoUpdater.checkForUpdates().catch(() => {});
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 60 * 60 * 1000);
+    return;
+  }
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   // Instead of a paid Windows signing certificate: our own signature (made on the server with the private key).
@@ -368,7 +386,7 @@ else {
     session.defaultSession.setPermissionCheckHandler((wc, perm) => perm === 'media' && !!win && wc === win.webContents);
     createWindow();
     try {
-      tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icon.ico')));
+      tray = new Tray(nativeImage.createFromPath(path.join(__dirname, LINUX ? 'icon.png' : 'icon.ico')));
       tray.setToolTip('CrashLands Overlay');
       tray.setContextMenu(Menu.buildFromTemplate([{ label: 'Open the dashboard', click: () => toggleDash(true) }, { type: 'separator' }, { label: 'Quit', click: () => app.quit() }]));
       tray.on('double-click', () => toggleDash(true));

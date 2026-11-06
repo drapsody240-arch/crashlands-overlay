@@ -1,7 +1,7 @@
 {
   "name": "crashlands-overlay",
   "productName": "CrashLands Overlay",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "The CrashLands overlay for The Isle: HUD, minimap, notifications and the player website in game",
   "author": "CrashLands",
   "private": true,
@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis --publish never",
-    "sign": "node tools/sign-release.cjs"
+    "sign": "node tools/sign-release.cjs",
+    "dist:linux": "electron-builder --linux AppImage --publish never"
   },
   "dependencies": {
     "electron-updater": "6.3.9",
@@ -22,11 +23,40 @@
   "build": {
     "appId": "online.crashlands.overlay",
     "productName": "CrashLands Overlay",
-    "directories": { "output": "release" },
-    "files": ["app/**/*", "update-public-key.pem", "package.json"],
-    "asarUnpack": ["node_modules/koffi/**"],
-    "win": { "target": "nsis", "icon": "app/icon.ico", "artifactName": "CrashLands-Overlay-Setup-${version}.${ext}" },
-    "nsis": { "oneClick": true, "perMachine": false, "deleteAppDataOnUninstall": false },
-    "publish": [{ "provider": "generic", "url": "https://players.crashlands.online/overlay/download/" }]
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "app/**/*",
+      "update-public-key.pem",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/koffi/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "app/icon.ico",
+      "artifactName": "CrashLands-Overlay-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://players.crashlands.online/overlay/download/"
+      }
+    ],
+    "linux": {
+      "target": "AppImage",
+      "icon": "app/icon.png",
+      "category": "Game",
+      "executableName": "crashlands-overlay",
+      "synopsis": "The CrashLands overlay for The Isle",
+      "artifactName": "CrashLands-Overlay-${version}-x86_64.${ext}"
+    }
   }
 }
