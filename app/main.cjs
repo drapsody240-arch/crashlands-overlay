@@ -50,13 +50,13 @@ function createWindow() {
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setIgnoreMouseEvents(true, { forward: true });
   win.loadFile(path.join(__dirname, 'ui', 'index.html'));
-  win.once('ready-to-show', () => win.showInactive());
+  win.once('ready-to-show', () => { win.showInactive(); keyboard(dashOpen); });
   win.on('closed', () => { win = null; });
 }
 // The player website in the dashboard, signed in with the overlay's session (as the site's own cookie).
 async function openDash() {
   const s = readSettings();
-  if (!s.token) { dashOpen = true; win.setIgnoreMouseEvents(false); win.focus(); send('dash', { open: true, needSignIn: true }); return; }
+  if (!s.token) { dashOpen = true; win.setIgnoreMouseEvents(false); win.focus(); keyboard(true); send('dash', { open: true, needSignIn: true }); return; }
   const ses = session.fromPartition(PARTITION);
   await ses.cookies.set({ url: SITE, name: 'isle_sid', value: s.token, secure: true, httpOnly: true, sameSite: 'lax', expirationDate: Math.floor(Date.now() / 1000) + 86400 * 90 }).catch(() => {});
   if (!dash) {
@@ -86,6 +86,7 @@ async function openDash() {
   win.setIgnoreMouseEvents(false);
   win.setAlwaysOnTop(true, 'screen-saver');
   win.focus();
+  keyboard(true);
   send('dash', { open: true });
 }
 function layoutDash() {
@@ -103,7 +104,7 @@ function toggleDash(open = !dashOpen) {
   dashOpen = false;
   if (dash) dash.setVisible(false);
   if (adminView) adminView.setVisible(false);
-  if (win) { win.setIgnoreMouseEvents(true, { forward: true }); win.blur(); }
+  if (win) { win.setIgnoreMouseEvents(true, { forward: true }); win.blur(); keyboard(false, true); }
   send('dash', { open: false });
 }
 
@@ -212,7 +213,7 @@ function track() {
     const want = dashOpen || !area || covers ? disp : area;
     const cur = win.getBounds();
     if (Math.abs(cur.x - want.x) > 1 || Math.abs(cur.y - want.y) > 1 || Math.abs(cur.width - want.width) > 1 || Math.abs(cur.height - want.height) > 1) { win.setBounds(want); layoutDash(); }
-    if (!win.isVisible()) win.showInactive();
+    if (!win.isVisible()) { win.showInactive(); keyboard(dashOpen); }
     // Games push themselves to the front (more so in windowed fullscreen), so "on top" is claimed again every second.
     if (Date.now() - lastTop > 1000) { lastTop = Date.now(); win.setAlwaysOnTop(true, 'screen-saver', 1); win.moveTop(); }
   } else if (win.isVisible()) win.hide();
@@ -230,6 +231,18 @@ function track() {
   } catch { send('state', { game: !!gameHwnd, front }); }
 }
 let lastTop = 0, warnedFullscreen = false;
+// Linux: the window manager would give the overlay the keyboard (and list it in alt-tab) like any window, so it's told
+// not to: the game keeps the keyboard unless the dashboard is open. Closing the dashboard hands the keyboard back to
+// the game. (Windows: the overlay never takes it, nothing to do.)
+function keyboard(on, giveBack = false) {
+  if (!LINUX || !win || win.isDestroyed()) return;
+  const n = native();
+  try {
+    n?.setPassive(win.getNativeWindowHandle(), !on);
+    if (on) n?.activate(win.getNativeWindowHandle());
+    else if (giveBack && gameHwnd) n?.activate(gameHwnd);
+  } catch { /* not X11 */ }
+}
 // Screen pixels -> Electron's scaled units. X11 pixels are physical: divided by the display's scaling.
 function toDip(r) {
   if (!LINUX) return screen.screenToDipRect(null, r);
@@ -385,6 +398,17 @@ else {
     session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(perm === 'media' && !!win && wc === win.webContents));
     session.defaultSession.setPermissionCheckHandler((wc, perm) => perm === 'media' && !!win && wc === win.webContents);
     createWindow();
+    // Linux, started with --diag: what the overlay sees every 5 seconds (windows, which is in front, the game), printed
+    // and saved to diag.txt in the overlay's settings folder, for helping a player whose game isn't found.
+    if (LINUX && process.argv.includes('--diag')) {
+      const file = path.join(app.getPath('userData'), 'diag.txt');
+      console.log(`CrashLands Overlay diagnostics: also saved to ${file}`);
+      setInterval(() => {
+        let d; try { d = native()?.diag() || { error: 'native module not loaded' }; } catch (e) { d = { error: e.message }; }
+        const line = `${new Date().toISOString()} ${JSON.stringify({ ...d, gameFound: !!gameHwnd, dashOpen })}`;
+        console.log(line); try { fs.appendFileSync(file, line + '\n'); } catch { /* read-only */ }
+      }, 5000);
+    }
     try {
       tray = new Tray(nativeImage.createFromPath(path.join(__dirname, LINUX ? 'icon.png' : 'icon.ico')));
       tray.setToolTip('CrashLands Overlay');

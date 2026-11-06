@@ -56,17 +56,56 @@ function boundsOf(w) {
 }
 const clientBounds = boundsOf;
 const exclusiveFullscreen = () => false; // no such mode under Proton: the game is an ordinary window
-// The Isle's game window: Steam names Proton windows steam_app_<app id> (The Isle is 376210), and the program is
-// TheIsleClient-Win64-Shipping.exe (or similar) running under Wine.
+// The Isle's game window, by any of: its class (Proton names it steam_app_<app id>, The Isle is 376210; plain Wine
+// uses the program's name), its title, or the program (TheIsleClient-Win64-Shipping.exe or similar under Wine; the
+// pid can be from inside Steam's container, so this one may not work).
+const titleOf = (w) => prop(w, '_NET_WM_NAME') || prop(w, 'WM_NAME') || '';
+function cmdOf(pid) { try { return pid ? fs.readFileSync(`/proc/${pid}/cmdline`, 'latin1').replace(/\0/g, ' ').trim() : ''; } catch { return ''; } }
 function isGame(w) {
-  const cls = prop(w, 'WM_CLASS') || '';
-  if (/steam_app_376210/i.test(cls)) return true;
   const pid = pidOf(w);
-  if (!pid) return false;
-  try { const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'latin1'); return /theisle[^/\\\0]*\.exe/i.test(cmd) && !/server/i.test(cmd); } catch { return false; }
+  if (pid === process.pid) return false; // our own windows
+  const cls = prop(w, 'WM_CLASS') || '';
+  if (/steam_app_376210\b/i.test(cls) || (/theisle/i.test(cls) && !/server/i.test(cls))) return true;
+  if (/^\s*the ?isle\b/i.test(titleOf(w)) && !/crashlands/i.test(titleOf(w))) return true;
+  const cmd = cmdOf(pid);
+  return /theisle[^/\\ ]*\.exe/i.test(cmd) && !/server/i.test(cmd);
 }
 function findGame() { for (const w of clientList()) if (isGame(w)) return w; return null; }
 const same = (a, b) => !!a && !!b && a === b;
+// What the overlay sees (for the --diag option): every window's class, title and program, and which one is in front.
+function diag() {
+  return { front: GetForegroundWindow(), game: findGame(), windows: clientList().map((w) => ({ id: w, class: (prop(w, 'WM_CLASS') || '').replace(/\0/g, ' ').trim(),
+    title: titleOf(w).slice(0, 80), pid: pidOf(w), cmd: cmdOf(pidOf(w)).slice(0, 160) })) };
+}
+
+// Our own overlay window: by default it never takes the keyboard (the game keeps it) and stays out of alt-tab and the
+// taskbar; while the dashboard is open it takes the keyboard. Through the window's input hint (ICCCM) and _NET_WM_STATE.
+const XWMHints = koffi.struct('XWMHints', { flags: 'long', input: 'int', initial_state: 'int', icon_pixmap: 'unsigned long', icon_window: 'unsigned long',
+  icon_x: 'int', icon_y: 'int', icon_mask: 'unsigned long', window_group: 'unsigned long' });
+const XGetWMHints = x11.func('XWMHints *XGetWMHints(void *dpy, unsigned long w)');
+const XSetWMHints = x11.func('int XSetWMHints(void *dpy, unsigned long w, XWMHints *hints)');
+const XSendEvent = x11.func('int XSendEvent(void *dpy, unsigned long w, int propagate, long mask, void *event)');
+const XFlush = x11.func('int XFlush(void *dpy)');
+const xidOf = (buf) => (buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0));
+// A message to the window manager about window w (XClientMessageEvent, format 32, inside a 192-byte XEvent).
+function wmMessage(w, type, data) {
+  const ev = Buffer.alloc(192);
+  ev.writeInt32LE(33, 0); ev.writeInt32LE(1, 16); ev.writeBigUInt64LE(BigInt(w), 32); ev.writeBigUInt64LE(BigInt(atom(type)), 40); ev.writeInt32LE(32, 48);
+  data.forEach((v, i) => ev.writeBigInt64LE(BigInt(v), 56 + i * 8));
+  XSendEvent(dpy, root, 0, (1 << 19) | (1 << 20) /* SubstructureNotify | SubstructureRedirect */, ev);
+}
+function setPassive(handle, passive) {
+  const w = xidOf(handle);
+  const p = XGetWMHints(dpy, w), h = p ? koffi.decode(p, XWMHints) : { flags: 0, input: 1, initial_state: 1, icon_pixmap: 0, icon_window: 0, icon_x: 0, icon_y: 0, icon_mask: 0, window_group: 0 };
+  if (p) XFree(p);
+  XSetWMHints(dpy, w, { ...h, flags: Number(h.flags) | 1 /* InputHint */, input: passive ? 0 : 1 });
+  // 1 = add: out of the taskbar, the pager and KDE's alt-tab switcher (source 1 = an application).
+  wmMessage(w, '_NET_WM_STATE', [1, atom('_NET_WM_STATE_SKIP_TASKBAR'), atom('_NET_WM_STATE_SKIP_PAGER'), 1, 0]);
+  wmMessage(w, '_NET_WM_STATE', [1, atom('_KDE_NET_WM_STATE_SKIP_SWITCHER'), 0, 1, 0]);
+  XFlush(dpy);
+}
+// Bring a window to the front with the keyboard (source 2 = a pager, which window managers always allow).
+function activate(w) { if (!w) return; wmMessage(typeof w === 'number' ? w : xidOf(w), '_NET_ACTIVE_WINDOW', [2, 0, 0, 0, 0]); XFlush(dpy); }
 
 // Push to talk: is this one key (or mouse button) held right now? Keys by X keysym name; mouse buttons as 1000 + the
 // X button number (middle 2, side buttons 8 and 9).
@@ -119,4 +158,4 @@ function keyDown(vk) {
     return (keys[vk >> 3] & (1 << (vk & 7))) !== 0;
   } catch { return false; }
 }
-module.exports = { GetForegroundWindow, IsWindow, pidOf, boundsOf, clientBounds, exclusiveFullscreen, findGame, same, vkOf, keyDown, linux: true };
+module.exports = { GetForegroundWindow, IsWindow, pidOf, boundsOf, clientBounds, exclusiveFullscreen, findGame, same, vkOf, keyDown, diag, setPassive, activate, linux: true };

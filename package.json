@@ -1,7 +1,7 @@
 {
   "name": "crashlands-overlay",
   "productName": "CrashLands Overlay",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "The CrashLands overlay for The Isle: HUD, minimap, notifications and the player website in game",
   "author": "CrashLands",
   "private": true,
