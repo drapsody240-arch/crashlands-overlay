@@ -23,7 +23,7 @@ const XQueryPointer = x11.func('int XQueryPointer(void *dpy, unsigned long w, _O
   '_Out_ int *wx, _Out_ int *wy, _Out_ unsigned int *mask)');
 // Xlib's default error handler ends the program, and a window can close between two calls: errors are ignored instead.
 const ErrorHandler = koffi.proto('int XErrorHandler(void *dpy, void *event)');
-const XSetErrorHandler = x11.func('void *XSetErrorHandler(ErrorHandler *handler)');
+const XSetErrorHandler = x11.func('void *XSetErrorHandler(XErrorHandler *handler)');
 XSetErrorHandler(koffi.register(() => 0, koffi.pointer(ErrorHandler)));
 
 const dpy = XOpenDisplay(null);
