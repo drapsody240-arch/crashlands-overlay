@@ -1,4 +1,4 @@
-// Signs the built installer with our private key (C:\IsleServer\secrets\overlay-signing-key.pem, never in git).
+// Signs the built installers (Windows .exe, Linux .AppImage from the GitHub build) with our private key (C:\IsleServer\secrets\overlay-signing-key.pem, never in git).
 // The overlay installs an update only if its .sig checks out against update-public-key.pem.
 // node tools/sign-release.cjs   (after npm run dist)
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
@@ -6,7 +6,7 @@ const REL = path.join(__dirname, '..', 'release');
 const key = fs.readFileSync(path.join(__dirname, '..', '..', 'secrets', 'overlay-signing-key.pem'), 'utf8');
 const pub = fs.readFileSync(path.join(__dirname, '..', 'update-public-key.pem'), 'utf8');
 let n = 0;
-for (const f of fs.readdirSync(REL).filter((x) => x.endsWith('.exe'))) {
+for (const f of fs.readdirSync(REL).filter((x) => x.endsWith('.exe') || x.endsWith('.AppImage'))) {
   const data = fs.readFileSync(path.join(REL, f)), sig = crypto.sign(null, data, key);
   if (!crypto.verify(null, data, pub, sig)) throw new Error('signature does not match the public key');
   fs.writeFileSync(path.join(REL, `${f}.sig`), sig.toString('base64'));
