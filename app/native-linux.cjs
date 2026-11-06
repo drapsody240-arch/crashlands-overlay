@@ -81,9 +81,12 @@ function vkOf(name) {
   let m = k.match(/^f(\d{1,2})$/); if (m && +m[1] >= 1 && +m[1] <= 24) sym = `F${+m[1]}`;
   m = k.match(/^num(?:pad)?(\d)$/); if (m) sym = `KP_${m[1]}`;
   if (!sym) return 0;
-  const ks = XStringToKeysym(sym);
-  return ks ? XKeysymToKeycode(dpy, ks) || 0 : 0;
+  const code = (s) => { const ks = XStringToKeysym(s); return ks ? XKeysymToKeycode(dpy, ks) || 0 : 0; };
+  return code(sym) || (F_ALT[sym] ? code(F_ALT[sym]) : 0);
 }
+// Most Linux keyboard layouts give the keys F13-F23 these names instead.
+const F_ALT = { F13: 'XF86Tools', F14: 'XF86Launch5', F15: 'XF86Launch6', F16: 'XF86Launch7', F17: 'XF86Launch8', F18: 'XF86Launch9',
+  F20: 'XF86AudioMicMute', F21: 'XF86TouchpadToggle', F22: 'XF86TouchpadOn', F23: 'XF86TouchpadOff' };
 // Side mouse buttons aren't in the core pointer state: XInput 2 has them (if libXi is there).
 let xi = null;
 function xiButtons() {
